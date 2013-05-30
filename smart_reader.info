@@ -1,3 +1,5 @@
 name = Smart Rss Reader
 description = A small and lightweight rss reader
 core = 7.x
+
+configure = admin/config/content/smart_reader
