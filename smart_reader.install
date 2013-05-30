@@ -1,0 +1,32 @@
+<?php
+
+  function smart_reader_schema() {
+      $schema = array();
+      $schema['smart_reader'] = array(
+      'description' => 'Contains the url-s for smart reader.',
+      'fields' => array(
+        'sr_id' => array(
+          'description' => 'The identifier for a url.',
+          'type' => 'serial',
+          'unsigned' => TRUE,
+          'not null' => TRUE),
+        'url' => array(
+          'description' => 'The url of an rss feed.',
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'default' => ''),
+        ),
+      'indexes' => array(
+
+        ),
+      'unique keys' => array(
+        'sr_id' => array('sr_id'),
+        'url' => array('url')
+        ),
+      'primary key' => array('sr_id'),
+    );
+
+    return $schema;
+  }
+ 

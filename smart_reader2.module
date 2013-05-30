@@ -1,0 +1,155 @@
+<?php
+
+/**
+ * Implements hook_help.
+ *
+ * Displays help and module information.
+ *
+ * @param path 
+ *   Which path of the site we're using to display help
+ * @param arg 
+ *   Array that holds the current path as returned from arg() function
+ */
+function stmart_reader_help($path, $arg) {
+	switch ($path) {
+    	case "admin/help#smart_reader":
+    		return '<p>' . t("Reads rss from different sources") . '</p>';
+    		break;
+	}
+}
+
+function smart_reader_helper_get_rss_content($max_post) {
+
+	$result = array();
+
+	$xml=("http://news.google.com/news?ned=us&topic=h&output=rss");
+	$xmlDoc = new DOMDocument();
+	$xmlDoc->load($xml);
+
+	//get elements from "<channel>"
+	$channel=$xmlDoc->getElementsByTagName('channel')->item(0);
+	$channel_title = $channel->getElementsByTagName('title')
+	->item(0)->childNodes->item(0)->nodeValue;
+	$channel_link = $channel->getElementsByTagName('link')
+	->item(0)->childNodes->item(0)->nodeValue;
+	$channel_desc = $channel->getElementsByTagName('description')
+	->item(0)->childNodes->item(0)->nodeValue;
+
+
+	$result['channel_title'] = $channel_title;
+	$result['channel_link'] = $channel_link;
+	$result['channel_desc'] = $channel_desc;
+
+	//get and output "<item>" elements
+
+	$result['items'] = array();
+	$x=$xmlDoc->getElementsByTagName('item');
+	for ($i = 0; $i < $max_post; $i++) {
+		  $item_title=$x->item($i)->getElementsByTagName('title')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+		  $item_link=$x->item($i)->getElementsByTagName('link')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+		  $item_desc=$x->item($i)->getElementsByTagName('description')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+
+		  $result['items'][$i] = array();
+		  $result['items'][$i]['title'] = $item_title;
+		  $result['items'][$i]['link'] = $item_link;
+		  $result['items'][$i]['desc'] = $item_desc;
+	}
+
+	return $result;
+}
+
+
+
+/**
+ * Implements hook_block_info().
+ */
+function smart_reader_block_info() {
+  $blocks['smart_reader'] = array(
+    'info' => t('Smart Reader'), //The name that will appear in the block list.
+    'cache' => DRUPAL_CACHE_PER_ROLE, //Default
+  );
+  return $blocks;
+}
+
+function smart_reader_block_view($delta = '') {
+   switch($delta){
+    case 'smart_reader':
+      //$block['subject'] = drupal_render(drupal_get_form('smart_reader_helper_form_function'));
+      if(user_access('access content')){
+        //Use our custom function to retrieve data.
+      	//$block['content'] = drupal_render(drupal_get_form('smart_reader_helper_form_function'));
+
+        $result = smart_reader_helper_get_rss_content(5);
+
+        $actChannelContent = '<h2>' . $result['channel_title'] . '</h2>';
+        $actChannelContent .= '<ul>';
+
+        foreach($result['items'] as $item) {
+        	$actChannelContent .= '<li>' . $item['title'] . '</li>';
+        }
+
+        $actChannelContent .= '</ul>';
+
+        /*$block['content'] = '<h2>' . $result['channel_title'] . '</h2>';
+
+        $block['content'] .= '<ul>';
+
+        foreach($result['items'] as $item) {
+        	$block['content'] .= '<li>' . $item['title'] . '</li>';
+        }
+
+        $block['content'] .= '</ul>';*/
+
+        $blockArray = array(
+		  'items' => array(
+		    '#markup' => $actChannelContent
+
+
+		  ),
+        	//'items' => $actChannelContent,
+			'form' => drupal_get_form('smart_reader_helper_form_function')
+		);
+		$block['content'] = $blockArray;
+        
+
+        
+        /*//Array to contain items for the block to render.
+        $items = array();
+        //Iterate over the resultset and format as links.
+        foreach ($result as $node){
+          $items[] = array(
+            'data' => l($node->title, 'node/' . $node->nid),
+          ); 
+        }
+      
+        if (empty($items)) { //No content in the last week.
+          $block['content'] = t('No posts available.');  
+        } 
+        else {
+          //Pass data through theme function.
+          $block['content'] = theme('item_list', array(
+            'items' => $items));
+        }*/
+      }
+    return $block;
+  }
+}
+
+function smart_reader_helper_form_function($form, &$form_state) {
+	$form['cím'] = array(
+	    '#type' => 'textfield', //you can find a list of available types in the form api
+	    '#title' => 'What is the url?',
+	    '#size' => 10,
+	    '#required' => TRUE, //make this field required 
+	);
+
+	$form['submit_button'] = array(
+	    '#type' => 'submit',
+	    '#value' => t('Click Here!')
+	);
+	  
+	return $form;
+}

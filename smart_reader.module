@@ -1,0 +1,216 @@
+<?php
+
+
+function smart_reader_permission() {
+	return array(
+		'submit smart_reader' => array(
+			'title' => t('Submit smart_reader'),
+			'description' => t('Submit smart_reader form')
+
+		) 
+	);
+}
+
+function smart_reader_menu() {
+	$items = array();
+	$items['smart_reader'] = array(
+		'title' => 'Lightweight rss reader',
+		'type' => MENU_NORMAL_ITEM,
+		'access arguments' => array('submit smart_reader'),
+		'page callback' => 'smart_reader_render_content',
+		'page arguments' => array()
+	);
+
+
+
+	return $items;
+}
+
+function smart_reader_render_content() {
+    
+    $actChannelContainer = smart_reader_get_feed_content_helper("http://news.google.com/news?ned=us&topic=h&output=rss",5);
+
+	$block = array(
+	  'items' => array(
+	    '#markup' => $actChannelContainer
+	  ),
+	  'form' => drupal_get_form('smart_reader_form')
+	);
+
+	return $block;
+}
+
+function smart_reader_get_feed_content($from, &$form_state) {
+
+	if(isset($form_state['values']['select_feed'])) {
+		$result = db_query("SELECT * FROM {smart_reader} WHERE sr_id = :id", array('id' => $form_state['values']['select_feed']));
+
+		if ($result) {
+	    	$row = $result->fetchAssoc();
+	    	return smart_reader_get_feed_content_helper($row['url'],5);
+		}
+	} 
+
+}
+
+function smart_reader_get_feed_content_helper($feed,$count) {
+	$result = smart_reader_helper_get_rss_content($feed,$count);
+	$actChannelContent = '<div id="smart_rss_container"><h2>' . $result['channel_title'] . '</h2><ul>';
+
+    foreach($result['items'] as $item) {
+    	$actChannelContent .= '<li>' . $item['title'] . '</li>';
+    }
+
+    $actChannelContent .= '</ul>';
+	$actChannelContent .= '</div>';
+
+    return $actChannelContent;
+}
+
+function smart_reader_form($form, &$form_state) {
+
+	$result = db_query("SELECT * FROM {smart_reader}");
+
+	$feed_list = array();
+
+	if ($result) {
+    	while ($row = $result->fetchAssoc()) {
+			$feed_list[$row['sr_id']] = $row['url']; 	          
+	    }
+	}
+
+	$mode = array(0 => t('Existing rss'), 1 => t('New rss'));
+
+	$form['htmlwrapper'] = array(
+		'#type' => 'markup',
+		'#prefix' => '<div id="test_div">test',
+		'#suffix' => '</div>'
+	);
+
+	$form['mode'] = array(
+	    '#type' => 'radios',
+	    '#default_value' => 0,
+	    '#options' => $mode,
+	    
+  	);
+
+    $form['choose_feed'] = array(
+    	'#title' => 'Choose a feed you\'d like to read!',
+    	'#type' => 'fieldset',
+    	'#collapsible' => TRUE,
+    	'#collapsed' => FALSE,
+    	'#states' => array(
+    		'visible' => array(
+    			':input[name="mode"]' => array('value' => 0)
+    		)
+    	)
+    );
+
+    $form['choose_feed']['select_feed'] = array(
+       '#type' => 'select',
+       '#title' => t('Select the reader'),
+       '#options' => $feed_list,
+       '#default_value' => '',
+       '#ajax' => array(
+       		'callback' => 'smart_reader_get_feed_content',
+       		'wrapper' => 'smart_rss_container'
+       	)
+    );
+
+    $form['save_feed'] = array(
+    	'#title' => 'Save a new rss feed!',
+    	'#type' => 'fieldset',
+    	'#collapsible' => TRUE,
+    	'#collapsed' => FALSE,
+    	'#states' => array(
+    		'visible' => array(
+    			':input[name="mode"]' => array('value' => 1)
+    		)
+    	)
+    );
+
+
+	$form['save_feed']['save_feed_field'] = array(
+	    '#type' => 'textfield',
+	    '#title' => 'What is the url?',
+	    '#size' => 10,
+	    '#required' => TRUE,
+	);
+
+	$form['save_feed']['save_feed_submit'] = array(
+	    '#type' => 'submit',
+	    '#value' => t('Click Here!')
+	);
+	
+	/*if(isset($form_state['values']['mode'])) {
+		if($form_state['values']['mode'] == 0) {
+			print('form state 0');
+		} else {
+			print('form state 1');
+		}
+	} else {
+		print('mode not set');
+	}*/
+	
+	return $form;
+}
+
+function smart_reader_mode() {
+	//print('mode changed'); die();
+}
+
+function smart_reader_form_validate($form, &$form_state) {
+	return true;
+}
+
+function smart_reader_form_submit($form, &$form_state) {
+	$sr_id = db_insert('smart_reader')
+			->fields(array(
+				'url' => $form_state['values']['url']
+			))
+			->execute();
+}
+
+function smart_reader_helper_get_rss_content($feed, $max_post) {
+
+	$result = array();
+
+	//$xml=("http://news.google.com/news?ned=us&topic=h&output=rss");
+	$xml = ($feed);
+	$xmlDoc = new DOMDocument();
+	$xmlDoc->load($xml);
+
+	//get elements from "<channel>"
+	$channel=$xmlDoc->getElementsByTagName('channel')->item(0);
+	$channel_title = $channel->getElementsByTagName('title')
+	->item(0)->childNodes->item(0)->nodeValue;
+	$channel_link = $channel->getElementsByTagName('link')
+	->item(0)->childNodes->item(0)->nodeValue;
+	$channel_desc = $channel->getElementsByTagName('description')
+	->item(0)->childNodes->item(0)->nodeValue;
+
+
+	$result['channel_title'] = $channel_title;
+	$result['channel_link'] = $channel_link;
+	$result['channel_desc'] = $channel_desc;
+
+	//get and output "<item>" elements
+
+	$result['items'] = array();
+	$x=$xmlDoc->getElementsByTagName('item');
+	for ($i = 0; $i < $max_post; $i++) {
+		  $item_title=$x->item($i)->getElementsByTagName('title')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+		  $item_link=$x->item($i)->getElementsByTagName('link')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+		  $item_desc=$x->item($i)->getElementsByTagName('description')
+		  ->item(0)->childNodes->item(0)->nodeValue;
+
+		  $result['items'][$i] = array();
+		  $result['items'][$i]['title'] = $item_title;
+		  $result['items'][$i]['link'] = $item_link;
+		  $result['items'][$i]['desc'] = $item_desc;
+	}
+
+	return $result;
+}
