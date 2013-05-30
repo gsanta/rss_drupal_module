@@ -22,6 +22,14 @@ function smart_reader_menu() {
 		'page arguments' => array()
 	);
 
+	$items['smart_reader/ajax'] = array(
+		'title' => 'Lightweight rss reader',
+		'type' => MENU_NORMAL_ITEM,
+		'access arguments' => array('submit smart_reader'),
+		'page callback' => 'smart_reader_display_feed_text',
+		'page arguments' => array()
+	);
+
 	$items['admin/config/content/smart_reader'] = array(
 	    'title' => 'Smart R(ss)eader',
 	    'description' => 'Configuration for Smart R(ss)eader module',
@@ -83,7 +91,7 @@ function smart_reader_admin_form_1($from, &$form_state) {
 	    '#required' => TRUE,
 	);
 
-	$form['new_feed_name'] = array(
+	$form['new_feed_title'] = array(
 		'#type' => 'textfield',
 	    '#title' => t('New rss feed\'s title.'),
 	    '#default_value' => '',
@@ -96,19 +104,32 @@ function smart_reader_admin_form_1($from, &$form_state) {
 	    '#value' => t('Add new feed!'),
 	    '#ajax' => array(
        		'callback' => 'smart_reader_admin_add_feed',
-       		'wrapper' => 'smart_rss_container'
+       		'wrapper' => 'smart_reader_new_feed_info'
        	)
 	);
-
-	if(isset($form_state['values']['new_feed_url'])) {
-		print($form_state['values']['new_feed_url']); die();
-	}
 
 	return $form;
 }
 
 function smart_reader_admin_add_feed($from, &$form_state) {
-	print($form_state['values']['new_feed_url']);
+
+	//if($form_state['values']
+
+	//$result = db_query("SELECT MAX(sr_id) as max_id FROM {smart_reader}");
+
+	/*if($result) {
+		$row = $result->fetchAssoc();*/
+		$nid = db_insert('smart_reader')
+			->fields(array(
+				  'url' => $form_state['values']['new_feed_url'],
+				  'title' => $form_state['values']['new_feed_title'],
+			))
+			->execute();
+	//}
+
+
+	
+	return '<h2>Oké</h2>';
 }
 
 function smart_reader_render_content() {
@@ -147,16 +168,35 @@ function smart_reader_get_feed_content($from, &$form_state) {
 
 function smart_reader_get_feed_content_helper($feed,$count) {
 	$result = smart_reader_helper_get_rss_content($feed,$count);
-	$actChannelContent = '<div id="smart_rss_container"><h2>' . $result['channel_title'] . '</h2><ul>';
+	$actChannelContent = '<div id="smart_rss_container"><h2>' . $result['channel_title'] . '</h2>';
 
+	$i = 0;
     foreach($result['items'] as $item) {
-    	$actChannelContent .= '<li>' . $item['title'] . '</li>';
+
+    	$link = array(
+		  '#type' => 'link',
+		  '#title' => $item['title'],
+		  '#href' => 'smart_reader/ajax',
+		  '#ajax' => array(
+		    'callback' => 'smart_reader_display_feed_text',
+		    'wrapper' => 'smart_reader_item_' . $i,
+		    'method' => 'replace',
+		    'effect' => 'fade',
+		  ),
+		);
+    	$actChannelContent .= '<div>' . drupal_render($link) . '</div>';
+    	$actChannelContent .= '<div id="smart_reader_item_' . $i  . '" style="display:none">content</div>';
+
+    	$i++;
     }
 
-    $actChannelContent .= '</ul>';
 	$actChannelContent .= '</div>';
 
     return $actChannelContent;
+}
+
+function smart_reader_display_feed_text() {
+	return '<div>contentjkjlkjl</div>';
 }
 
 function smart_reader_form($form, &$form_state) {
