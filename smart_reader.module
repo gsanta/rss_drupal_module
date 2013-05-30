@@ -27,9 +27,16 @@ function smart_reader_menu() {
 }
 
 function smart_reader_render_content() {
-    
-    $actChannelContainer = smart_reader_get_feed_content_helper("http://news.google.com/news?ned=us&topic=h&output=rss",5);
 
+	$result = db_query("SELECT * FROM {smart_reader}");
+
+	$actChannelContainer = "";
+
+	if ($result) {
+    	$row = $result->fetchAssoc();
+    	$actChannelContainer = smart_reader_get_feed_content_helper($row['url'],5);
+	}
+    
 	$block = array(
 	  'items' => array(
 	    '#markup' => $actChannelContainer
@@ -81,18 +88,12 @@ function smart_reader_form($form, &$form_state) {
 
 	$mode = array(0 => t('Existing rss'), 1 => t('New rss'));
 
-	$form['htmlwrapper'] = array(
-		'#type' => 'markup',
-		'#prefix' => '<div id="test_div">test',
-		'#suffix' => '</div>'
-	);
-
-	$form['mode'] = array(
+	/*$form['mode'] = array(
 	    '#type' => 'radios',
 	    '#default_value' => 0,
 	    '#options' => $mode,
 	    
-  	);
+  	);*/
 
     $form['choose_feed'] = array(
     	'#title' => 'Choose a feed you\'d like to read!',
@@ -117,7 +118,7 @@ function smart_reader_form($form, &$form_state) {
        	)
     );
 
-    $form['save_feed'] = array(
+    /*$form['save_feed'] = array(
     	'#title' => 'Save a new rss feed!',
     	'#type' => 'fieldset',
     	'#collapsible' => TRUE,
@@ -140,7 +141,7 @@ function smart_reader_form($form, &$form_state) {
 	$form['save_feed']['save_feed_submit'] = array(
 	    '#type' => 'submit',
 	    '#value' => t('Click Here!')
-	);
+	);*/
 	
 	/*if(isset($form_state['values']['mode'])) {
 		if($form_state['values']['mode'] == 0) {

@@ -16,10 +16,16 @@
           'length' => 255,
           'not null' => TRUE,
           'default' => ''),
+        'title' => array(
+          'description' => 'The title of an rss feed.',
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'default' => '')
         ),
       'indexes' => array(
 
-        ),
+       ),
       'unique keys' => array(
         'sr_id' => array('sr_id'),
         'url' => array('url')
