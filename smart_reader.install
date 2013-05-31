@@ -27,12 +27,23 @@
 
        ),
       'unique keys' => array(
-        'sr_id' => array('sr_id'),
-        'url' => array('url')
+        'sr_id' => array('sr_id')
         ),
       'primary key' => array('sr_id'),
     );
 
     return $schema;
+  }
+
+  function smart_reader_install() {
+    db_insert('smart_reader')->fields(array(
+      'url' => 'http://hvg.hu/rss/itthon',
+      'title' => 'Hvg itthon'
+    ))->execute();
+
+    db_insert('smart_reader')->fields(array(
+      'url' => 'http://news.google.com/news?ned=us&topic=h&output=rss',
+      'title' => 'Google news'
+    ))->execute();
   }
  

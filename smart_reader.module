@@ -1,6 +1,32 @@
 <?php
+/**
+ * @file
+ * A block module that displays rss feeds.
+ */
 
+/**
+ * Implements hook_help.
+ *
+ * Displays help and module information.
+ *
+ * @param path 
+ *   Which path of the site we're using to display help
+ * @param arg 
+ *   Array that holds the current path as returned from arg() function
+ */
+function smart_reader_help($path, $arg) {
+  switch ($path) {
+    case "admin/help#smart_reader":
+      return '<p>' . t("Displays a list of rss feed, you can choose from.") . '</p>';
+      break;
+  }
+} 
 
+/**
+ * Implements hook_permission.
+ *
+ *
+ */
 function smart_reader_permission() {
 	return array(
 		'submit smart_reader' => array(
@@ -11,30 +37,42 @@ function smart_reader_permission() {
 	);
 }
 
+/**
+ * Implements hook_menu.
+ *
+ * It has three items: 
+ *   the first is the normal item for the users, 
+ * 	 user url /smart_reader to display and read the rss feeds.
+ *   
+ *   the second is an ajax callback function, you have to click on an rss
+ *   feed title to display it's content, and this ajax link handles it.
+ * 
+ *   the third is the admin config link, where an admin can add new rss
+ *   feeds.   
+ */
 function smart_reader_menu() {
 	$items = array();
 	
 	$items['smart_reader'] = array(
-		'title' => 'Lightweight rss reader',
+		'title' => 'Smart R(ss)eader',
 		'type' => MENU_NORMAL_ITEM,
 		'access arguments' => array('submit smart_reader'),
 		'page callback' => 'smart_reader_render_content',
 		'page arguments' => array()
 	);
 
-	$items['smart_reader/ajax'] = array(
+	$items['smart_reader/ajax/%'] = array(
 		'title' => 'Lightweight rss reader',
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_CALLBACK,
 		'access arguments' => array('submit smart_reader'),
 		'page callback' => 'smart_reader_display_feed_text',
-		'page arguments' => array()
+		'page arguments' => array(2)
 	);
 
 	$items['admin/config/content/smart_reader'] = array(
 	    'title' => 'Smart R(ss)eader',
 	    'description' => 'Configuration for Smart R(ss)eader module',
 	    'page callback' => 'smart_reader_render_config',
-	    //'page arguments' => array('smart_reader_admin_form'),
 	    'access arguments' => array('access administration pages'),
 	    'type' => MENU_NORMAL_ITEM,
 	  );
@@ -44,16 +82,17 @@ function smart_reader_menu() {
 	return $items;
 }
 
+/**
+ * Handles the admin area.
+ *
+ * It renders two forms: 
+ *   In the first form the admin can determine the max. number of
+ *   feed items to display. (the default is 5 items)
+ *   
+ *   In the second form the admin can add new a feed.
+ *   
+ */
 function smart_reader_render_config() {
-
-	$result = db_query("SELECT * FROM {smart_reader}");
-
-	$actChannelContainer = "";
-
-	if ($result) {
-    	$row = $result->fetchAssoc();
-    	$actChannelContainer = smart_reader_get_feed_content_helper($row['url'],variable_get('smart_reader_max_item', 5));
-	}
     
 	$block = array(
 	  'form0' => drupal_get_form('smart_reader_admin_form_0'),
@@ -63,6 +102,10 @@ function smart_reader_render_config() {
 	return $block;
 }
 
+/**
+ * A form that is in the admin area, it's purpose is to change
+ * the maximum number of feed items to display.
+ */
 function smart_reader_admin_form_0($from, &$form_state) {
 	$form['smart_reader_max_item'] = array(
 	    '#type' => 'textfield',
@@ -77,6 +120,11 @@ function smart_reader_admin_form_0($from, &$form_state) {
   	return system_settings_form($form);
 }
 
+/**
+ * A form that is in the admin area, it's purpose is to add
+ * a new rss feed. It uses ajax, and calls the smart_reader_admin_add_feed
+ * function to handle the request.
+ */
 function smart_reader_admin_form_1($from, &$form_state) {
 	$form['new_feed_status'] = array(
 		'#type' => 'markup',
@@ -111,27 +159,33 @@ function smart_reader_admin_form_1($from, &$form_state) {
 	return $form;
 }
 
+/**
+ * A callback function, inserts the new feed into database.
+ */
 function smart_reader_admin_add_feed($from, &$form_state) {
 
-	//if($form_state['values']
+	$message = '<h2 class="smart_reader_success_message">The new feed was added!</h2>';
 
-	//$result = db_query("SELECT MAX(sr_id) as max_id FROM {smart_reader}");
-
-	/*if($result) {
-		$row = $result->fetchAssoc();*/
-		$nid = db_insert('smart_reader')
+	$nid = db_insert('smart_reader')
 			->fields(array(
 				  'url' => $form_state['values']['new_feed_url'],
 				  'title' => $form_state['values']['new_feed_title'],
 			))
 			->execute();
-	//}
 
-
+	$form_state['values']['new_feed_url'] = "";
+	$form_state['values']['new_feed_title'] = "";
 	
-	return '<h2>Oké</h2>';
+	return $message;
 }
 
+/**
+ * It's purpose to render the content when the page is displayed.
+ * It queries the first feed in the database,
+ * uses smart_reader_get_feed_content_helper to render the content.
+ * Then it uses drupal_get_form to build a form, where the user can
+ * change the feed.
+ */
 function smart_reader_render_content() {
 
 	$result = db_query("SELECT * FROM {smart_reader}");
@@ -166,6 +220,11 @@ function smart_reader_get_feed_content($from, &$form_state) {
 
 }
 
+/**
+ * It builds the html elements of the actual feed.
+ * The feed item's title is a link, the body of the item is hidden at first,
+ * and when the user clicks on the link the body is displayed (through an ajax call).
+ */
 function smart_reader_get_feed_content_helper($feed,$count) {
 	$result = smart_reader_helper_get_rss_content($feed,$count);
 	$actChannelContent = '<div id="smart_rss_container"><h2>' . $result['channel_title'] . '</h2>';
@@ -176,16 +235,13 @@ function smart_reader_get_feed_content_helper($feed,$count) {
     	$link = array(
 		  '#type' => 'link',
 		  '#title' => $item['title'],
-		  '#href' => 'smart_reader/ajax',
+		  '#href' => 'smart_reader/ajax/' . $i,
 		  '#ajax' => array(
-		    'callback' => 'smart_reader_display_feed_text',
-		    'wrapper' => 'smart_reader_item_' . $i,
-		    'method' => 'replace',
 		    'effect' => 'fade',
 		  ),
 		);
-    	$actChannelContent .= '<div>' . drupal_render($link) . '</div>';
-    	$actChannelContent .= '<div id="smart_reader_item_' . $i  . '" style="display:none">content</div>';
+    	$actChannelContent .= '<div class="smart_reader_item_title" id="smart_reader_item_title_' . $i . '">' . drupal_render($link) . '</div>';
+    	$actChannelContent .= '<div id="smart_reader_item_' . $i  . '" style="display:none" class="smart_reader_item">' . $item['desc'] . '</div>';
 
     	$i++;
     }
@@ -195,10 +251,26 @@ function smart_reader_get_feed_content_helper($feed,$count) {
     return $actChannelContent;
 }
 
-function smart_reader_display_feed_text() {
-	return '<div>contentjkjlkjl</div>';
+/**
+ *  The body of a feed item, when the feed items link is clicked,
+ *  this function handles the query and displayes the item's text.
+ */
+function smart_reader_display_feed_text($index) {
+	$commands = array();
+
+	$commands[] = ajax_command_invoke('.smart_reader_item_title', removeClass, array('smart_reader_act_title'));
+	$commands[] = ajax_command_invoke('#smart_reader_item_title_' . $index, addClass, array('smart_reader_act_title'));
+	$commands[] = ajax_command_invoke('.smart_reader_item', hide, array('medium'));
+	$commands[] = ajax_command_invoke('#smart_reader_item_' . $index, show, array('medium'));
+	ajax_deliver(array('#type' => 'ajax', '#commands' => $commands));
 }
 
+/**
+ *  This is the form, where the user can change
+ *  the feed, which is displayed. It uses ajax,
+ *  the smart_reader_get_feed_content callback function
+ *  handles the query.
+ */
 function smart_reader_form($form, &$form_state) {
 
 	$result = db_query("SELECT * FROM {smart_reader}");
@@ -212,13 +284,6 @@ function smart_reader_form($form, &$form_state) {
 	}
 
 	$mode = array(0 => t('Existing rss'), 1 => t('New rss'));
-
-	/*$form['mode'] = array(
-	    '#type' => 'radios',
-	    '#default_value' => 0,
-	    '#options' => $mode,
-	    
-  	);*/
 
     $form['choose_feed'] = array(
     	'#title' => 'Choose a feed you\'d like to read!',
@@ -242,71 +307,20 @@ function smart_reader_form($form, &$form_state) {
        		'wrapper' => 'smart_rss_container'
        	)
     );
-
-    /*$form['save_feed'] = array(
-    	'#title' => 'Save a new rss feed!',
-    	'#type' => 'fieldset',
-    	'#collapsible' => TRUE,
-    	'#collapsed' => FALSE,
-    	'#states' => array(
-    		'visible' => array(
-    			':input[name="mode"]' => array('value' => 1)
-    		)
-    	)
-    );
-
-
-	$form['save_feed']['save_feed_field'] = array(
-	    '#type' => 'textfield',
-	    '#title' => 'What is the url?',
-	    '#size' => 10,
-	    '#required' => TRUE,
-	);
-
-	$form['save_feed']['save_feed_submit'] = array(
-	    '#type' => 'submit',
-	    '#value' => t('Click Here!')
-	);*/
-	
-	/*if(isset($form_state['values']['mode'])) {
-		if($form_state['values']['mode'] == 0) {
-			print('form state 0');
-		} else {
-			print('form state 1');
-		}
-	} else {
-		print('mode not set');
-	}*/
-	
 	return $form;
 }
 
-function smart_reader_mode() {
-	//print('mode changed'); die();
-}
-
-function smart_reader_form_validate($form, &$form_state) {
-	return true;
-}
-
-function smart_reader_form_submit($form, &$form_state) {
-	$sr_id = db_insert('smart_reader')
-			->fields(array(
-				'url' => $form_state['values']['url']
-			))
-			->execute();
-}
-
+/**
+ *  Loads the rss feed from an url, and parses it.
+ */
 function smart_reader_helper_get_rss_content($feed, $max_post) {
 
 	$result = array();
 
-	//$xml=("http://news.google.com/news?ned=us&topic=h&output=rss");
 	$xml = ($feed);
 	$xmlDoc = new DOMDocument();
 	$xmlDoc->load($xml);
 
-	//get elements from "<channel>"
 	$channel=$xmlDoc->getElementsByTagName('channel')->item(0);
 	$channel_title = $channel->getElementsByTagName('title')
 	->item(0)->childNodes->item(0)->nodeValue;
@@ -319,8 +333,6 @@ function smart_reader_helper_get_rss_content($feed, $max_post) {
 	$result['channel_title'] = $channel_title;
 	$result['channel_link'] = $channel_link;
 	$result['channel_desc'] = $channel_desc;
-
-	//get and output "<item>" elements
 
 	$result['items'] = array();
 	$x=$xmlDoc->getElementsByTagName('item');
